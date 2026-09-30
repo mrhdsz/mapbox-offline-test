@@ -3,12 +3,17 @@ import Foundation
 struct ResourceProgress: Equatable {
     var completedCount: UInt64 = 0
     var requiredCount: UInt64 = 0
+    var erroredCount: UInt64 = 0
     var completedBytes: UInt64 = 0
     var isFinished = false
     var errorMessage: String?
 
+    /// Mapbox treats a pack or region as complete only when every required resource is stored.
+    var isComplete: Bool {
+        isFinished && errorMessage == nil && requiredCount > 0 && completedCount >= requiredCount
+    }
+
     var fraction: Double {
-        if isFinished, errorMessage == nil { return 1 }
         guard requiredCount > 0 else { return 0 }
         return min(1, Double(completedCount) / Double(requiredCount))
     }

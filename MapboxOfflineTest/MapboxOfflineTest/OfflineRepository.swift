@@ -253,6 +253,7 @@ final class OfflineRepository {
                     self?.styleProgress[rawURI] = ResourceProgress(
                         completedCount: progress.completedResourceCount,
                         requiredCount: progress.requiredResourceCount,
+                        erroredCount: progress.erroredResourceCount,
                         completedBytes: progress.completedResourceSize
                     )
                 }
@@ -265,7 +266,11 @@ final class OfflineRepository {
                             completedCount: pack.completedResourceCount,
                             requiredCount: pack.requiredResourceCount,
                             completedBytes: pack.completedResourceSize,
-                            isFinished: true
+                            isFinished: true,
+                            errorMessage: Self.incompleteMessage(
+                                completed: pack.completedResourceCount,
+                                required: pack.requiredResourceCount
+                            )
                         )
                     case let .failure(error):
                         var failed = self.styleProgress[rawURI] ?? ResourceProgress()
@@ -291,6 +296,7 @@ final class OfflineRepository {
                 self?.tileProgress = ResourceProgress(
                     completedCount: progress.completedResourceCount,
                     requiredCount: progress.requiredResourceCount,
+                    erroredCount: progress.erroredResourceCount,
                     completedBytes: progress.completedResourceSize
                 )
             }
@@ -303,7 +309,11 @@ final class OfflineRepository {
                         completedCount: region.completedResourceCount,
                         requiredCount: region.requiredResourceCount,
                         completedBytes: region.completedResourceSize,
-                        isFinished: true
+                        isFinished: true,
+                        errorMessage: Self.incompleteMessage(
+                            completed: region.completedResourceCount,
+                            required: region.requiredResourceCount
+                        )
                     )
                 case let .failure(error):
                     self.tileProgress.isFinished = true
@@ -323,12 +333,17 @@ final class OfflineRepository {
     }
 
     private func makeLoadOptions(geometry: Geometry, zoomRange: ClosedRange<UInt8>, name: String) -> TileRegionLoadOptions? {
+        // An empty style URL downloads only `tilesetURLs`. A real style URI would also
+        // download every tiled source in that style.
         let descriptor = offlineManager.createTilesetDescriptor(
             for: TilesetDescriptorOptions(
-                styleURI: OfflineConfig.primaryStyleURI,
-                zoomRange: zoomRange,
+                styleURI: "",
+                minZoom: zoomRange.lowerBound,
+                maxZoom: zoomRange.upperBound,
+                pixelRatio: Float(UIScreen.main.scale),
                 tilesets: OfflineConfig.tilesetURLs,
-                stylePackOptions: nil
+                stylePack: nil,
+                extraOptions: nil
             )
         )
         let metadata: [String: Any] = [
@@ -466,6 +481,11 @@ final class OfflineRepository {
 
     private func thumbnailDirectory() -> URL {
         Self.thumbnailDirectory()
+    }
+
+    private static func incompleteMessage(completed: UInt64, required: UInt64) -> String? {
+        guard required > 0, completed < required else { return nil }
+        return "Incomplete: \(completed) of \(required) resources stored."
     }
 
     nonisolated private static func intValue(_ value: Any?) -> Int? {

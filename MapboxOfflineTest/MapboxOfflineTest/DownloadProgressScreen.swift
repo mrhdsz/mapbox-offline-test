@@ -59,8 +59,8 @@ struct DownloadProgressScreen: View {
             HStack {
                 Text(title)
                 Spacer()
-                Text(progress.isFinished && progress.errorMessage == nil ? "Done" : ByteText.string(for: progress.completedBytes))
-                    .foregroundStyle(.secondary)
+                Text(progressLabel(progress))
+                    .foregroundStyle(progress.isComplete ? .secondary : .primary)
                     .font(.caption)
             }
             ProgressView(value: progress.fraction)
@@ -73,7 +73,18 @@ struct DownloadProgressScreen: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if !progress.isFinished, progress.erroredCount > 0 {
+                Text("\(progress.erroredCount) resources hit an error and are being retried.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
         }
         .padding(.vertical, 4)
+    }
+
+    private func progressLabel(_ progress: ResourceProgress) -> String {
+        if progress.isComplete { return "Complete" }
+        if progress.isFinished, progress.errorMessage != nil { return "Incomplete" }
+        return ByteText.string(for: progress.completedBytes)
     }
 }
