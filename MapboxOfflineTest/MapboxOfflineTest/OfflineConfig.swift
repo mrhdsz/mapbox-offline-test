@@ -31,8 +31,8 @@ enum OfflineConfig {
         "mapbox://polaris-riderx.Dev-Sources-polygons",
         "mapbox://polaris-riderx.Ride_Command_Trails_Enriched",
         "mapbox://polaris-riderx.Pois-foursquare",
-        "mapbox://polaris-riderx.rideConditions_dev",
-        "mapbox://polaris-riderx.5xv0az7r",
+        //"mapbox://polaris-riderx.rideConditions_dev",
+        //"mapbox://polaris-riderx.5xv0az7r",
     ]
 
     static var primaryStyleURI: StyleURI {
