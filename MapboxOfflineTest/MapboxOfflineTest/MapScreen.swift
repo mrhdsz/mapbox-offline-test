@@ -3,11 +3,13 @@ import MapboxMaps
 import SwiftUI
 
 struct MapScreen: View {
+    @Environment(OfflineRepository.self) private var repository
     @State private var styleURI = OfflineConfig.styleURIs[0]
 
     var body: some View {
         Map(initialViewport: .camera(center: Self.defaultCenter, zoom: 2, bearing: 0, pitch: 0))
             .mapStyle(MapStyle(uri: OfflineConfig.styleURI(for: styleURI) ?? OfflineConfig.primaryStyleURI))
+            .id(repository.mapGeneration)
             .ignoresSafeArea(edges: .bottom)
             .safeAreaInset(edge: .top) {
                 Picker("Style", selection: $styleURI) {

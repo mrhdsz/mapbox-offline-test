@@ -3,6 +3,7 @@ import SwiftUI
 struct ToolsScreen: View {
     @Environment(OfflineRepository.self) private var repository
     @State private var confirmClear = false
+    @State private var confirmViewCache = false
 
     var body: some View {
         NavigationStack {
@@ -26,12 +27,41 @@ struct ToolsScreen: View {
                 }
 
                 Section {
+                    LabeledContent("View cache") {
+                        Text(ByteText.string(for: repository.viewCacheBytes))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Clear map cache") {
+                        repository.refreshViewCacheSize()
+                        confirmViewCache = true
+                    }
+                    .disabled(repository.isClearingViewCache)
+
+                    if repository.isClearingViewCache {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Clearing tiles saved while viewing the map…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if let viewCacheMessage = repository.viewCacheMessage {
+                        Text(viewCacheMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Removes the disk cache filled by panning and zooming. The size is the map cache on disk, not downloaded style packs or tile regions.")
+                }
+
+                Section {
                     NavigationLink("Offline data summary") {
                         OfflineSummaryScreen()
                     }
                 }
             }
             .navigationTitle("Tools")
+            .onAppear { repository.refreshViewCacheSize() }
             .alert("Clear offline data?", isPresented: $confirmClear) {
                 Button("Clear", role: .destructive) {
                     repository.clearAll()
@@ -39,6 +69,14 @@ struct ToolsScreen: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This removes all style packs, tile regions, and saved thumbnails from this device.")
+            }
+            .alert("Clear map cache?", isPresented: $confirmViewCache) {
+                Button("Clear cache", role: .destructive) {
+                    repository.clearViewCache()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes \(ByteText.string(for: repository.viewCacheBytes)) cached by viewing the map. Offline downloads stay on the device.")
             }
         }
     }

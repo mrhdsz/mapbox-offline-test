@@ -17,8 +17,7 @@ enum OfflineConfig {
     /// Mapbox TileJSON sources. These are the only tilesets placed on the
     /// tileset descriptor, so tile packs are not derived from a style.
     static let tilesetURLs: [String] = [
-        "mapbox://mapbox.mapbox-streets-v8",
-        "mapbox://mapbox.mapbox-terrain-v2",
+        "mapbox://polaris-riderx.polaris-locations-dev,polaris-riderx.Dev-Sources-points-lines,polaris-riderx.Dev-Sources-polygons,mapbox.mapbox-terrain-v2,polaris-riderx.Ride_Command_Trails_Enriched,polaris-riderx.Pois-foursquare,polaris-riderx.rideConditions_dev,polaris-riderx.5xv0az7r",
     ]
 
     static var primaryStyleURI: StyleURI {

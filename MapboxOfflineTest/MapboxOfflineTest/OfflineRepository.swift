@@ -17,6 +17,10 @@ final class OfflineRepository {
     private(set) var tileProgress = ResourceProgress()
     private(set) var activeDownloadID: String?
     private(set) var isClearing = false
+    private(set) var isClearingViewCache = false
+    private(set) var viewCacheBytes: UInt64 = 0
+    private(set) var viewCacheMessage: String?
+    private(set) var mapGeneration = 0
     private(set) var statusMessage: String?
 
     private var estimateCancelable: (any Cancelable)?
@@ -128,6 +132,34 @@ final class OfflineRepository {
         downloadCancelables.removeAll()
         snapshotter?.cancel()
         snapshotter = nil
+    }
+
+    /// Size of the disk cache filled by panning and zooming. Mapbox does not expose this
+    /// as an API, so it is the on-disk size of the map data cache that `clearData` removes.
+    func refreshViewCacheSize() {
+        viewCacheBytes = Self.byteCount(of: Self.viewCacheDirectory())
+    }
+
+    /// Removes tiles stored while panning and zooming. Offline style packs and tile regions stay.
+    func clearViewCache() {
+        guard !isClearingViewCache else { return }
+        refreshViewCacheSize()
+        let clearedBytes = viewCacheBytes
+        isClearingViewCache = true
+        viewCacheMessage = nil
+        MapboxMap.clearData { [weak self] error in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isClearingViewCache = false
+                self.refreshViewCacheSize()
+                if let error {
+                    self.viewCacheMessage = error.localizedDescription
+                } else {
+                    self.mapGeneration += 1
+                    self.viewCacheMessage = "Cleared \(ByteText.string(for: clearedBytes)). Downloaded regions are unchanged."
+                }
+            }
+        }
     }
 
     func clearAll() {
@@ -398,6 +430,33 @@ final class OfflineRepository {
 
     nonisolated private static func thumbnailURL(for regionID: String) -> URL {
         thumbnailDirectory().appendingPathComponent("\(regionID).jpg")
+    }
+
+    /// The view cache lives in `map_data`, next to but not inside the tile store.
+    private static func viewCacheDirectory() -> URL {
+        let dataPath = MapboxMapsOptions.dataPath
+        if dataPath.lastPathComponent == "map_data" {
+            return dataPath
+        }
+        return dataPath.appendingPathComponent("map_data", isDirectory: true)
+    }
+
+    private static func byteCount(of directory: URL) -> UInt64 {
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]
+        ) else {
+            return 0
+        }
+        var total: UInt64 = 0
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+                  values.isRegularFile == true else {
+                continue
+            }
+            total += UInt64(values.fileSize ?? 0)
+        }
+        return total
     }
 
     nonisolated private static func thumbnailDirectory() -> URL {
