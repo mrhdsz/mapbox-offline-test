@@ -5,6 +5,7 @@ struct ResourceProgress: Equatable {
     var requiredCount: UInt64 = 0
     var erroredCount: UInt64 = 0
     var completedBytes: UInt64 = 0
+    var loadedBytes: UInt64 = 0
     var isFinished = false
     var errorMessage: String?
 
@@ -23,6 +24,8 @@ struct RegionEstimate: Equatable {
     var transferBytes: UInt64
     var storageBytes: UInt64
     var errorMargin: Double
+    var sampledCount: UInt64 = 0
+    var requiredCount: UInt64 = 0
 }
 
 struct DownloadedRegion: Identifiable, Equatable {

@@ -24,6 +24,7 @@ final class OfflineRepository {
     private(set) var statusMessage: String?
 
     private var estimateCancelable: (any Cancelable)?
+    private var estimateGeneration = 0
     private var downloadCancelables: [any Cancelable] = []
     private var snapshotter: Snapshotter?
     private var refreshGeneration = 0
@@ -64,6 +65,9 @@ final class OfflineRepository {
 
     func updateEstimate(geometry: Geometry, zoomRange: ClosedRange<UInt8>) {
         estimateCancelable?.cancel()
+        estimateGeneration += 1
+        let generation = estimateGeneration
+        estimate = nil
         estimateError = nil
         isEstimating = true
 
@@ -73,25 +77,54 @@ final class OfflineRepository {
             return
         }
 
+        // The default estimator stops after 5 seconds once its margin is within 5%.
+        // That margin assumes even tile sizes, so sparse tilesets report a few megabytes
+        // for a region that stores well over 100 MB. A precise timeout of 0 keeps
+        // sampling until the margin reaches zero, bounded by the hard timeout.
+        let estimateOptions = TileRegionEstimateOptions(
+            errorMargin: 0.05,
+            preciseEstimationTimeout: 0,
+            timeout: 90,
+            extraOptions: nil
+        )
+
         estimateCancelable = tileStore.estimateTileRegion(
             forId: "size-estimate",
             loadOptions: loadOptions,
-            progress: { _ in },
+            estimateOptions: estimateOptions,
+            progress: { [weak self] progress in
+                let partial = progress.partialResult
+                let sampledCount = progress.completedResourceCount
+                let requiredCount = progress.requiredResourceCount
+                Task { @MainActor in
+                    guard let self, generation == self.estimateGeneration else { return }
+                    self.estimate = RegionEstimate(
+                        transferBytes: partial.transferSize,
+                        storageBytes: partial.storageSize,
+                        errorMargin: partial.errorMargin,
+                        sampledCount: sampledCount,
+                        requiredCount: requiredCount
+                    )
+                }
+            },
             completion: { [weak self] result in
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, generation == self.estimateGeneration else { return }
                     self.isEstimating = false
                     switch result {
                     case let .success(value):
-                        self.estimate = RegionEstimate(
+                        var updated = self.estimate ?? RegionEstimate(
                             transferBytes: value.transferSize,
                             storageBytes: value.storageSize,
                             errorMargin: value.errorMargin
                         )
+                        updated.transferBytes = value.transferSize
+                        updated.storageBytes = value.storageSize
+                        updated.errorMargin = value.errorMargin
+                        self.estimate = updated
                         self.estimateError = nil
                     case let .failure(error):
                         if case TileRegionError.canceled = error { return }
-                        self.estimate = nil
                         self.estimateError = error.localizedDescription
                     }
                 }
@@ -121,6 +154,7 @@ final class OfflineRepository {
     }
 
     func cancelEstimate() {
+        estimateGeneration += 1
         estimateCancelable?.cancel()
         estimateCancelable = nil
         isEstimating = false
@@ -254,7 +288,8 @@ final class OfflineRepository {
                         completedCount: progress.completedResourceCount,
                         requiredCount: progress.requiredResourceCount,
                         erroredCount: progress.erroredResourceCount,
-                        completedBytes: progress.completedResourceSize
+                        completedBytes: progress.completedResourceSize,
+                        loadedBytes: progress.loadedResourceSize
                     )
                 }
             } completion: { [weak self] result in
@@ -297,7 +332,8 @@ final class OfflineRepository {
                     completedCount: progress.completedResourceCount,
                     requiredCount: progress.requiredResourceCount,
                     erroredCount: progress.erroredResourceCount,
-                    completedBytes: progress.completedResourceSize
+                    completedBytes: progress.completedResourceSize,
+                    loadedBytes: progress.loadedResourceSize
                 )
             }
         } completion: { [weak self] result in

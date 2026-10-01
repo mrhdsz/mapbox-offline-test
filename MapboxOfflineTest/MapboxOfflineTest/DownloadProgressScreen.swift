@@ -73,6 +73,11 @@ struct DownloadProgressScreen: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if title == "Tile packs", let estimate = repository.estimate, !progress.isFinished {
+                Text("Estimated storage \(ByteText.string(for: estimate.storageBytes))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             if !progress.isFinished, progress.erroredCount > 0 {
                 Text("\(progress.erroredCount) resources hit an error and are being retried.")
                     .font(.caption2)
@@ -83,8 +88,11 @@ struct DownloadProgressScreen: View {
     }
 
     private func progressLabel(_ progress: ResourceProgress) -> String {
-        if progress.isComplete { return "Complete" }
+        if progress.isComplete {
+            return "Stored \(ByteText.string(for: progress.completedBytes))"
+        }
         if progress.isFinished, progress.errorMessage != nil { return "Incomplete" }
-        return ByteText.string(for: progress.completedBytes)
+        let downloaded = max(progress.completedBytes, progress.loadedBytes)
+        return "Downloaded \(ByteText.string(for: downloaded))"
     }
 }

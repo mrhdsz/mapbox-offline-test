@@ -110,20 +110,31 @@ struct RegionPickerScreen: View {
 
     @ViewBuilder
     private var estimateLabel: some View {
-        if repository.isEstimating {
-            HStack(spacing: 8) {
-                ProgressView()
-                Text("Estimating download size…")
-                    .font(.subheadline)
-            }
-        } else if let estimate = repository.estimate {
+        if let estimate = repository.estimate {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Transfer \(ByteText.string(for: estimate.transferBytes))")
                 Text("Storage \(ByteText.string(for: estimate.storageBytes))")
-                Text(String(format: "Estimate margin ±%.0f%%", estimate.errorMargin * 100))
+                Text("Transfer \(ByteText.string(for: estimate.transferBytes))")
+                Text(String(format: "Margin ±%.0f%%", estimate.errorMargin * 100))
                     .foregroundStyle(.secondary)
+                if repository.isEstimating {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(samplingText(for: estimate))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                if let estimateError = repository.estimateError {
+                    Text(estimateError)
+                        .foregroundStyle(.red)
+                }
             }
             .font(.subheadline)
+        } else if repository.isEstimating {
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Sampling tiles for a size estimate…")
+                    .font(.subheadline)
+            }
         } else if let estimateError = repository.estimateError {
             Text(estimateError)
                 .font(.subheadline)
@@ -133,6 +144,11 @@ struct RegionPickerScreen: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func samplingText(for estimate: RegionEstimate) -> String {
+        guard estimate.requiredCount > 0 else { return "Sampling tiles…" }
+        return "Sampled \(estimate.sampledCount) of \(estimate.requiredCount) resources"
     }
 
     private func squareRect(in size: CGSize) -> CGRect {
